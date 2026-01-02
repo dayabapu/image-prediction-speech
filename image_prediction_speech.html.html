@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Prediction to Speech</title>
+</head>
+<body>
+  <h2>Teachable Machine – Image to Speech</h2>
+
+  <button onclick="init()">Start Camera</button>
+  <div id="webcam-container"></div>
+  <div id="label-container"></div>
+
+  <!-- TensorFlow & Teachable Machine -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+
+  <script>
+    const URL = "https://teachablemachine.withgoogle.com/models/pyAkC98Rj/";
+
+    let model, webcam, labelContainer, maxPredictions;
+    let lastSpoken = "";
+
+    async function init() {
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+
+      webcam = new tmImage.Webcam(300, 300, true);
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
+
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+      labelContainer = document.getElementById("label-container");
+
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+      }
+    }
+
+    async function loop() {
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      const prediction = await model.predict(webcam.canvas);
+
+      let highest = prediction[0];
+      for (let i = 1; i < prediction.length; i++) {
+        if (prediction[i].probability > highest.probability) {
+          highest = prediction[i];
+        }
+      }
+
+      labelContainer.innerHTML =
+        highest.className + " : " + (highest.probability * 100).toFixed(1) + "%";
+
+      if (highest.className !== lastSpoken && highest.probability > 0.80) {
+        speakText(highest.className);
+        lastSpoken = highest.className;
+      }
+    }
+
+    function speakText(text) {
+      const speech = new SpeechSynthesisUtterance(text);
+      speech.lang = "en-IN"; // change to "mr-IN" for Marathi
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(speech);
+    }
+  </script>
+</body>
+</html>
